@@ -1,0 +1,9 @@
+# pyDoSap
+PySide6>=6.7
+requests>=2.31
+python-dotenv>=1.0
+openpyxl>=3.1
+dotenv
+
+# SAP GUI Scripting (COM) - somente Windows
+pywin32>=306; sys_platform == "win32"
