@@ -6,7 +6,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QThread, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QAbstractItemView, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QProgressBar,
+    QAbstractItemView, QCheckBox, QFileDialog, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QProgressBar,
     QPushButton, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget,
 )
 
@@ -42,6 +42,14 @@ class UploadTab(QWidget):
 
         self.lbl = QLabel("Nenhuma pasta selecionada.")
         raiz.addWidget(self.lbl)
+
+        self.chk_forcar = QCheckBox("Forçar integração (CT-es com mais de 90 dias)")
+        self.chk_forcar.setToolTip(
+            "A listagem do Lincros só traz os últimos 90 dias. Com esta opção o XML é enviado ao "
+            "Lincros (upload síncrono) e o CT-e é gravado direto na base de lançamento, aparecendo "
+            "na aba Lançamento. O XML precisa ser de CT-e autorizado (cStat 100)."
+        )
+        raiz.addWidget(self.chk_forcar)
 
         self.tabela = QTableWidget(0, 3)
         self.tabela.setHorizontalHeaderLabels(["Arquivo", "Resultado", "Resposta do servidor"])
@@ -88,10 +96,15 @@ class UploadTab(QWidget):
     def _enviar(self) -> None:
         if self.em_execucao() or not self._arquivos:
             return
+        forcar = self.chk_forcar.isChecked()
+        extra = (
+            "\n\nIntegração forçada: cada CT-e também será gravado na base de lançamento "
+            "(ctes_api) e ficará disponível na aba Lançamento."
+        ) if forcar else ""
         r = QMessageBox.question(
             self, "Enviar XMLs",
             f"Enviar {len(self._arquivos)} arquivo(s) para o TMS?\n\n"
-            "O processamento de cada arquivo é síncrono e pode demorar.", Yes | No, No,
+            f"O processamento de cada arquivo é síncrono e pode demorar.{extra}", Yes | No, No,
         )
         if r != Yes:
             return
@@ -101,7 +114,7 @@ class UploadTab(QWidget):
         self.progresso.setValue(0)
 
         self._thread = QThread(self)
-        self._worker = UploadWorker(self.api, list(self._arquivos))
+        self._worker = UploadWorker(self.api, list(self._arquivos), forcar)
         w = self._worker
         w.moveToThread(self._thread)
         self._thread.started.connect(w.run)
@@ -114,6 +127,7 @@ class UploadTab(QWidget):
 
         self.btn_enviar.setEnabled(False)
         self.btn_pasta.setEnabled(False)
+        self.chk_forcar.setEnabled(False)
         self.btn_parar.setEnabled(True)
         self.execucao_alterada.emit(True)
         self._thread.start()
@@ -141,7 +155,7 @@ class UploadTab(QWidget):
         self.tabela.scrollToBottom()
 
     def _on_concluido(self, ok: int, total: int) -> None:
-        texto = f"{ok} de {total} arquivo(s) enviado(s) com sucesso."
+        texto = f"{ok} de {total} arquivo(s) integrado(s) com sucesso."
         self.mensagem.emit(texto)
         QMessageBox.information(self, "Upload concluído", texto)
 
@@ -156,6 +170,7 @@ class UploadTab(QWidget):
         self._worker = None
         self._thread = None
         self.btn_pasta.setEnabled(True)
+        self.chk_forcar.setEnabled(True)
         self.btn_parar.setEnabled(False)
         self.btn_enviar.setEnabled(bool(self._arquivos))
         self.execucao_alterada.emit(False)

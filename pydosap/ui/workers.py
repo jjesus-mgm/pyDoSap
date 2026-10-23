@@ -137,9 +137,10 @@ class UploadWorker(QObject):
     falhou = Signal(str)
     finished = Signal()
 
-    def __init__(self, api: ApiClient, arquivos: list[Path]):
+    def __init__(self, api: ApiClient, arquivos: list[Path], forcar_integracao: bool = False):
         super().__init__()
         self._api, self._arquivos = api, arquivos
+        self._forcar = forcar_integracao
         self._parar = threading.Event()
 
     def parar(self) -> None:
@@ -153,7 +154,8 @@ class UploadWorker(QObject):
                 self.progress.emit(n, total)
 
             resultados = enviar_xmls(
-                self._api, self._arquivos, on_result=ao_enviar, should_stop=self._parar.is_set
+                self._api, self._arquivos, forcar_integracao=self._forcar,
+                on_result=ao_enviar, should_stop=self._parar.is_set,
             )
         except Exception as e:  # noqa: BLE001
             self.falhou.emit(str(e))

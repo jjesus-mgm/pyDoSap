@@ -125,11 +125,37 @@ class ApiClient:
             headers={"Content-Type": "application/json; charset=utf-8"},
         )
 
-    def upload_xml(self, nome_arquivo: str, xml: bytes) -> str:
-        """POST /cte/upload - XML puro no corpo, nome do arquivo no header X-File-Name."""
+    @staticmethod
+    def _cabecalho_xml(nome_arquivo: str) -> dict:
         nome = nome_arquivo.encode("latin-1", "replace").decode("latin-1")
+        return {"Content-Type": "application/xml; charset=utf-8", "X-File-Name": nome}
+
+    def upload_xml(self, nome_arquivo: str, xml: bytes) -> str:
+        """POST /cte/upload - upload síncrono: XML puro no corpo, nome do arquivo no header
+        X-File-Name. A resposta traz o retorno do Lincros (oidCte, protocolo, status)."""
         r = self._request(
             "POST", "/cte/upload", data=xml, timeout=UPLOAD_TIMEOUT,
-            headers={"Content-Type": "application/xml; charset=utf-8", "X-File-Name": nome},
+            headers=self._cabecalho_xml(nome_arquivo),
         )
         return r.text
+
+    def forcar_integracao(self, nome_arquivo: str, xml: bytes) -> dict:
+        """POST /cte/forcar-integracao - para CT-es com mais de 90 dias, que a listagem do Lincros
+        não traz: sobe o XML (síncrono) e grava o CT-e direto na ctes_api. Devolve o JSON com
+        `status` (INTEGRADO, JA_INTEGRADO, NAO_INTEGRADO, ERRO_LINCROS, XML_INVALIDO)."""
+        try:
+            r = self._request(
+                "POST", "/cte/forcar-integracao", data=xml, timeout=UPLOAD_TIMEOUT,
+                headers=self._cabecalho_xml(nome_arquivo),
+            )
+        except ApiError as e:
+            if e.status == 404:
+                raise ApiError(
+                    "O servidor ainda não tem a rota /cte/forcar-integracao (backend desatualizado).",
+                    404,
+                ) from e
+            raise
+        dados = self._json(r)
+        if not isinstance(dados, dict):
+            raise ApiError("Formato inesperado na resposta da integração forçada.")
+        return dados

@@ -21,7 +21,12 @@ o backend Flask continua o mesmo.
   (`GET/POST /cte/config/<ação>/<tabela>`). "Salvar" grava a tabela inteira
   (o backend substitui a tabela, não faz update por linha); "Reverter"
   restaura o backup feito automaticamente na última gravação.
-- **Upload de XML** — envia XMLs de CT-e para o TMS, um por vez
+- **Upload de XML** — envia XMLs de CT-e para o TMS, um por vez (upload síncrono: a resposta
+  já diz se o Lincros integrou o documento — só vale como integrado se vier o `oidCte`).
+  A opção **Forçar integração** (`POST /cte/forcar-integracao`) serve para CT-es com mais de
+  90 dias, que a listagem do Lincros não traz: o backend sobe o XML, recupera o oid e grava a
+  linha direto em `ctes_api`; o CT-e passa a aparecer na aba Lançamento (a resposta informa se
+  ele ficou "PARA LANCAR" ou o motivo do bloqueio). Reenviar o mesmo XML é seguro (não duplica).
 
 ## Executar (Windows, com SAP GUI aberto e logado)
 
